@@ -1,9 +1,10 @@
 package com.group.cover_hub.security;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -12,8 +13,11 @@ import java.util.Date;
 
 @Service
 public class JwtService {
-    private final String secret = "qwertasdfzxcvtuyighjkbnm,i[pokl;'m,./qwerasdfzxcv123454321";
-    SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    private final SecretKey key;
+
+    public JwtService(@Value("${jwt.secret}") String secret){
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    }
 
     public String generateToken(String username){
         return Jwts.builder()
@@ -24,20 +28,28 @@ public class JwtService {
                 .compact();
     }
 
-    public Boolean isExpired(String token){
+    public Boolean isValid(String token){
         try {
-            SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
             Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(token);
-            return false;
+            return true;
 
         } catch (ExpiredJwtException e){
-            return true;
+            return false;
         } catch (Exception e){
-            return true;
+            return false;
         }
     }
 
+
+    public String extractUsername(String token){
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        return claims.getSubject();
+    }
 }
