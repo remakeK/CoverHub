@@ -1,4 +1,4 @@
-package com.group.cover_hub.model.service;
+package com.group.cover_hub.service;
 
 import com.group.cover_hub.model.entity.User;
 import com.group.cover_hub.repository.UserRepository;
@@ -12,8 +12,7 @@ import java.util.List;
 public class UserService {
     private final UserRepository userRepository;
 
-    @
-    public List<User> getUsers(){
+    public List<User> getAllUsers(){
         return userRepository.findAll();
     }
 }

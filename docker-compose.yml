@@ -1,0 +1,25 @@
+services:
+  backend:
+    build: ./backend
+    container_name: cover-hub-backend
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:18
+    container_name: cover-hub-postgres
+    environment:
+      POSTGRES_DB: cover-hub
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+volumes:
+  postgres_data:
