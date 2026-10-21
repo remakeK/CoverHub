@@ -1,7 +1,8 @@
-package com.group.cover_hub.security;
+package com.group.cover_hub.security.service;
 
 import com.group.cover_hub.repository.UserRepository;
 import com.group.cover_hub.model.entity.User;
+import com.group.cover_hub.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
