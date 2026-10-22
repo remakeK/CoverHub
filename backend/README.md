@@ -1,3 +1,15 @@
+# Готовые эндпоинты
+
+### авторизация
+1. http://localhost:8080/auth/login (email, password)
+2. http://localhost:8080/auth/register (name, email, password)
+3. http://localhost:8080/auth/refresh (refreshToken)
+4. http://localhost:8080/auth/logout (refreshToken)
+
+### пользователи
+1. http://localhost:8080/users/all **для тестов**
+2. http://localhost:8080/users/{id} (id)
+
 # Сущности
 
 ## Пользователь
