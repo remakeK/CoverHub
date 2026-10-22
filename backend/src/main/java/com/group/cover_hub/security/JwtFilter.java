@@ -1,5 +1,7 @@
 package com.group.cover_hub.security;
 
+import com.group.cover_hub.security.service.CustomUserDetailsService;
+import com.group.cover_hub.security.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,25 +20,37 @@ import java.io.IOException;
 public class JwtFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final CustomUserDetailsService customUserDetailsService;
-
     @Override
-    public void doFilterInternal(HttpServletRequest request,
-                                 HttpServletResponse response,
-                                 FilterChain filterChain) throws ServletException, IOException{
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
+
         String authHeader = request.getHeader("Authorization");
 
-        if(authHeader == null || !authHeader.startsWith("Bearer ")){
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
+
         String token = authHeader.substring(7);
 
-        if(SecurityContextHolder.getContext().getAuthentication() == null && jwtService.isValid(token)){
-            String username = jwtService.extractUsername(token);
-            UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
-            UsernamePasswordAuthenticationToken authenticationToken =
-                    new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-            SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+        if (SecurityContextHolder.getContext().getAuthentication() == null
+                && jwtService.isValidAccessToken(token)) {
+
+            String username = jwtService.extractUsernameFromAccessToken(token);
+            UserDetails userDetails =
+                    customUserDetailsService.loadUserByUsername(username);
+
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+            SecurityContextHolder.getContext()
+                    .setAuthentication(authentication);
         }
         filterChain.doFilter(request, response);
     }

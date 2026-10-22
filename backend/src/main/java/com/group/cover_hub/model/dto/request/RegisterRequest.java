@@ -1,4 +1,4 @@
-package com.group.cover_hub.model.dto;
+package com.group.cover_hub.model.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -12,7 +12,7 @@ public class RegisterRequest {
     @NotBlank(message = "Имя не может быть пустым")
     private String name;
 
-    @NotBlank(message = "Пароль обязателен")
+    @NotBlank(message = "Почта обязательна")
     @Email(message = "Некорректный формат пароля")
     private String email;
 
