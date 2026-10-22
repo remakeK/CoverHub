@@ -12,7 +12,7 @@ public class RegisterRequest {
     @NotBlank(message = "Имя не может быть пустым")
     private String name;
 
-    @NotBlank(message = "Пароль обязателен")
+    @NotBlank(message = "Почта обязательна")
     @Email(message = "Некорректный формат пароля")
     private String email;
 
