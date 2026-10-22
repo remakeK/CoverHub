@@ -1,4 +1,4 @@
-package com.group.cover_hub.model.dto;
+package com.group.cover_hub.model.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

@@ -1,6 +1,6 @@
 package com.group.cover_hub.security.service;
 
-import com.group.cover_hub.model.dto.RegisterRequest;
+import com.group.cover_hub.model.dto.request.RegisterRequest;
 import com.group.cover_hub.model.entity.RefreshSession;
 import com.group.cover_hub.model.entity.User;
 import com.group.cover_hub.model.enums.UserRole;

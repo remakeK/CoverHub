@@ -17,8 +17,10 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/all")
-    @PreAuthorize("hasAnyRole('USER')")
+    //@PreAuthorize("hasAnyRole('USER')")
     public List<User> getAllUsers(){
         return userService.getAllUsers();
     }
+
+
 }

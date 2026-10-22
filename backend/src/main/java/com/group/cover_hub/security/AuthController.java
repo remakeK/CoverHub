@@ -1,7 +1,7 @@
 package com.group.cover_hub.security;
 
-import com.group.cover_hub.model.dto.LoginRequest;
-import com.group.cover_hub.model.dto.RegisterRequest;
+import com.group.cover_hub.model.dto.request.LoginRequest;
+import com.group.cover_hub.model.dto.request.RegisterRequest;
 import com.group.cover_hub.security.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
