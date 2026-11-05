@@ -10,6 +10,37 @@
 1. http://localhost:8080/users/all **для тестов**
 2. http://localhost:8080/users/{id} (id)
 
+### Категория
+1. `GET /api/categories`
+2. `GET /api/categories/{id}` (id)
+
+### Оригинальная песня
+1. `GET /api/original-songs` (id)
+2. `GET /api/original-songs/{id}` (id)
+
+### Оригинальный артист
+1. `GET /api/original-artists`
+2. `GET /api/original-artists/{id}` (id)
+
+### Кавер
+1. `GET /api/covers`
+2. `GET /api/covers/{id}`
+
+### Входные данные
+1. `id` — для получения кавера по id
+
+### Исполнитель кавера
+1. `GET /api/performers`
+2. `GET /api/performers/{id}` (id)
+
+### Комментарий к каверу
+1. `GET /api/comments`
+2. `GET /api/comments/{id}` (id)
+
+### Оценка кавера
+1. `GET /api/ratings`
+2. `GET /api/ratings/{id}` (id)
+
 # Сущности
 
 ## Пользователь
@@ -41,7 +72,7 @@
 8. дата загрузки
 9. id пользователя, загрузившего кавер
 
-5,6,7 - хотя бы одно из трех должно быть, приоритет показа сверху вниз
+5,6,7 - хотя бы одно из трех должно быть
 ## Исполнитель кавера
 1. id кавера
 2. id пользователя(может быть null)

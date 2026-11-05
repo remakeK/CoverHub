@@ -54,4 +54,7 @@ public class Cover {
 
     @OneToMany(mappedBy = "cover")
     private List<Comment> comments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "cover", cascade = CascadeType.ALL)
+    private List<MediaAsset> mediaAssets = new ArrayList<>();
 }
