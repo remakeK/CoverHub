@@ -23,6 +23,9 @@ public class Cover {
     private String title;
 
     @Column
+    private String thumbnailUrl;
+
+    @Column
     private String videoUrl;
 
     @Column

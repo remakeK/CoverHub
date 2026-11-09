@@ -18,7 +18,7 @@ public class MediaController {
             @RequestParam("file") MultipartFile file,
             @RequestParam("mediaType") MediaType mediaType
     ) {
-        String storageKey = storageService.save(file, mediaType);
+        String storageKey = storageService.upload(file, mediaType);
 
         return ResponseEntity.ok(storageKey);
     }

@@ -20,8 +20,7 @@ public class MediaAsset {
     @Column(nullable = false)
     private MediaType mediaType;
 
-    private String storageKey;
-    private String youtubeVideoId;
+    private String objectKey;
     private String originalFileName;
     private String mimeType;
     private Long fileSize;
