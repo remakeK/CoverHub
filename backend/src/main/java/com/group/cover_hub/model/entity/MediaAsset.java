@@ -7,7 +7,13 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name="media_assets")
+@Table(name = "media_assets",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_media_assets_cover_type",
+                        columnNames = {"cover_id", "media_type"}
+                )
+        })
 @Getter
 @Setter
 @NoArgsConstructor
