@@ -8,8 +8,27 @@ services:
       - .env
     depends_on:
       - postgres
+      - minio
     volumes:
       - ./storage:/app/storage
+
+  minio:
+    image: alpine/minio:RELEASE.2025-10-15T17-29-55Z
+    container_name: minio
+    command: server /data --address ":9010" --console-address ":9011"
+    restart: unless-stopped
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9010:9010"
+      - "9011:9011"
+    volumes:
+      - minio-data:/data
+    logging:
+      driver: json-file
+      options:
+        max-file: "3"
 
   postgres:
     image: postgres:18
@@ -25,3 +44,4 @@ services:
 
 volumes:
   postgres_data:
+  minio-data:

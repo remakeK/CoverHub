@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 public class CoverResponse {
     private Long id;
     private String title;
-    private String videoUrl;
+    private String hlsMasterObjectKey;
     private String audioUrl;
     private String youtubeUrl;
     private LocalDateTime createdAt;

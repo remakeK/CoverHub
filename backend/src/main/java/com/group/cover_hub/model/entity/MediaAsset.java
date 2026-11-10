@@ -7,7 +7,13 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name="media_assets")
+@Table(name = "media_assets",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_media_assets_cover_type",
+                        columnNames = {"cover_id", "media_type"}
+                )
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,8 +26,7 @@ public class MediaAsset {
     @Column(nullable = false)
     private MediaType mediaType;
 
-    private String storageKey;
-    private String youtubeVideoId;
+    private String objectKey;
     private String originalFileName;
     private String mimeType;
     private Long fileSize;
