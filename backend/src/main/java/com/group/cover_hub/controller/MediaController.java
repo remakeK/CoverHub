@@ -44,7 +44,11 @@ public class MediaController {
         try {
             String masterPlaylistKey = hlsProcessingService.processVideo(coverId);
 
-            return ResponseEntity.ok(Map.of("masterPlaylist", masterPlaylistKey));
+            String playbackUrl = "/api/covers/" + coverId + "/media/hls/master.m3u8";
+
+            return ResponseEntity.ok(
+                    Map.of("playbackUrl", playbackUrl)
+            );
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

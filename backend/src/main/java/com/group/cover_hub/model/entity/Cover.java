@@ -27,7 +27,7 @@ public class Cover {
     private String thumbnailUrl;
 
     @Column
-    private String videoUrl;
+    private String hlsMasterObjectKey;
 
     @Column
     private String audioUrl;

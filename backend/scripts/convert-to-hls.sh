@@ -5,9 +5,9 @@ set -e
 INPUT="$1"
 OUTPUT="$2"
 
-mkdir -p "$OUTPUT/stream_0"
-mkdir -p "$OUTPUT/stream_1"
-mkdir -p "$OUTPUT/stream_2"
+mkdir -p "$OUTPUT/1080p"
+mkdir -p "$OUTPUT/720p"
+mkdir -p "$OUTPUT/480p"
 
 ffmpeg -i "$INPUT" \
 -filter_complex \

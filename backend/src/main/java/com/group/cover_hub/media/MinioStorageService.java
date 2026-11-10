@@ -4,10 +4,7 @@ import com.group.cover_hub.exception.ResourceAlreadyExistsException;
 import com.group.cover_hub.exception.ResourceNotFoundException;
 import com.group.cover_hub.model.entity.Cover;
 import com.group.cover_hub.model.entity.MediaAsset;
-import com.group.cover_hub.model.enums.MediaType;
-import com.group.cover_hub.model.enums.SupportedAudioType;
-import com.group.cover_hub.model.enums.SupportedImageType;
-import com.group.cover_hub.model.enums.SupportedVideoType;
+import com.group.cover_hub.model.enums.*;
 import com.group.cover_hub.repository.CoverRepository;
 import com.group.cover_hub.repository.MediaAssetRepository;
 import io.minio.GetObjectArgs;
@@ -84,7 +81,14 @@ public class MinioStorageService implements StorageService {
                     file.getSize(),
                     file.getContentType()
             );
+            if(mediaType.equals(MediaType.VIDEO) || mediaType.equals(MediaType.AUDIO)){
+                cover.setStatus(CoverStatus.UPLOADED);
+
+                coverRepository.save(cover);
+            }
+
         } catch (IOException e) {
+
             throw new RuntimeException(
                     "Ошибка при загрузке файла в MinIO", e
             );
