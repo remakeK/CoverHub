@@ -1,5 +1,6 @@
 package com.group.cover_hub.model.entity;
 
+import com.group.cover_hub.model.enums.CoverStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -33,6 +34,10 @@ public class Cover {
 
     @Column
     private String youtubeUrl;
+
+    @Enumerated(EnumType.STRING)
+    //@Column(nullable = false)
+    private CoverStatus status;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
