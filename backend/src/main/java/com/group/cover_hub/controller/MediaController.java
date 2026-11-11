@@ -1,8 +1,10 @@
 package com.group.cover_hub.controller;
 
 import com.group.cover_hub.media.HlsProcessingService;
+import com.group.cover_hub.media.MediaService;
 import com.group.cover_hub.media.StorageService;
 import com.group.cover_hub.model.enums.MediaType;
+import io.minio.errors.MinioException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -22,9 +24,10 @@ import java.util.Map;
 public class MediaController {
     private final StorageService storageService;
     private final HlsProcessingService hlsProcessingService;
+    private final MediaService mediaService;
 
     @PostMapping("/{coverId}/media")
-    public ResponseEntity<Void> uploadMedia(
+    public ResponseEntity<String> uploadMedia(
             @PathVariable Long coverId,
             @RequestParam(required = false) MultipartFile video,
             @RequestParam(required = false) MultipartFile audio,
@@ -34,13 +37,13 @@ public class MediaController {
         uploadIfPresent(coverId, audio, MediaType.AUDIO);
         uploadIfPresent(coverId, image, MediaType.IMAGE);
 
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body("Все файлы загрузились без ошибок.");
     }
 
-    @PostMapping("/{coverId}/media/VIDEO/process")
-    public ResponseEntity<Map<String, String>> processVideo(
-            @PathVariable Long coverId
-    ) {
+    @PostMapping("/{coverId}/media/video/process")
+    public ResponseEntity<Map<String, String>> processVideo(@PathVariable Long coverId) {
         try {
             String masterPlaylistKey = hlsProcessingService.processVideo(coverId);
 
@@ -68,6 +71,22 @@ public class MediaController {
         }
     }
 
+    @DeleteMapping("/{coverId}/media/video")
+    public ResponseEntity<Void> deleteVideo(@PathVariable Long coverId) {
+        try {
+            mediaService.deleteVideo(coverId);
+        } catch (IOException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Ошибка при удалении видео", e
+            );
+        } catch (MinioException e) {
+            throw new RuntimeException(e);
+        }
+
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{coverId}/media/{mediaType}/download")
     public ResponseEntity<StreamingResponseBody> downloadMedia(
             @PathVariable Long coverId,
@@ -91,11 +110,7 @@ public class MediaController {
                 .body(responseBody);
     }
 
-    private void uploadIfPresent(
-            Long coverId,
-            MultipartFile file,
-            MediaType mediaType
-    ) {
+    private void uploadIfPresent(Long coverId, MultipartFile file, MediaType mediaType) {
         if (file != null && !file.isEmpty()) {
             storageService.upload(coverId, file, mediaType);
         }

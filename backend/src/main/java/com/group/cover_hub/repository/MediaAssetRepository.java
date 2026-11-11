@@ -18,4 +18,6 @@ public interface MediaAssetRepository extends JpaRepository<MediaAsset, Long> {
             Long coverId,
             MediaType mediaType
     );
+
+    boolean existsByCover_Id(Long coverId);
 }

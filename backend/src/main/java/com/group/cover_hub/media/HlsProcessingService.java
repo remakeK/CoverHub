@@ -35,15 +35,16 @@ public class HlsProcessingService {
         MediaAsset video = mediaAssetRepository
                 .findByCover_IdAndMediaType(coverId, MediaType.VIDEO)
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "Video not found for cover: " + coverId
+                        new ResourceNotFoundException(
+                                "Элемент не найден"
                         )
                 );
+
         Cover cover = coverRepository
                 .findById(coverId)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
-                                        "Искомого кавера не существует."
+                                        "Элемент не найден"
                                 )
                         );
         cover.setStatus(CoverStatus.PROCESSING);
