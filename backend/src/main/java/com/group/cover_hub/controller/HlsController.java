@@ -24,9 +24,10 @@ public class HlsController {
     private final CoverRepository coverRepository;
     private final HlsProcessingService hlsProcessingService;
 
-    @GetMapping("/{coverId}/media/hls/{*objectPath}")
+    @GetMapping("/{coverId}/media/hls/{mediaType}/{*objectPath}")
     public ResponseEntity<StreamingResponseBody> getHlsFile(
             @PathVariable Long coverId,
+            @PathVariable String mediaType,
             @PathVariable String objectPath
     ) {
         if (!coverRepository.existsById(coverId)) {
@@ -36,19 +37,28 @@ public class HlsController {
             );
         }
 
-        // Убираем начальный слеш, который может присутствовать
-        // в значении catch-all переменной Spring
+        if(fromStringToEnum(mediaType).equals(
+                com.group.cover_hub.model.enums.MediaType.IMAGE
+        )){
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Изображение не поддерживает потоковую передачу"
+            );
+        }
+
         String relativePath = objectPath.startsWith("/")
                 ? objectPath.substring(1)
                 : objectPath;
 
-        // Не позволяем обращаться к объектам вне директории кавера
         if (relativePath.isBlank()
                 || relativePath.contains("\\")
                 || relativePath.startsWith("/")
                 || relativePath.contains("../")
                 || relativePath.equals("..")
-                || relativePath.contains("/./")) {
+                || relativePath.contains("/./")
+                || relativePath.contains("/..")
+        )
+    {
 
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -56,7 +66,12 @@ public class HlsController {
             );
         }
 
-        String objectKey = "hls/" + coverId + "/" + relativePath;
+        String objectKey = "hls/"
+                + mediaType.toLowerCase(Locale.ROOT)
+                + "/"
+                + coverId
+                + "/"
+                + relativePath;
 
         String contentType = getContentType(relativePath);
 
@@ -66,7 +81,7 @@ public class HlsController {
             inputStream = minioStorageService.downloadObject(objectKey);
         } catch (IOException e) {
             throw new ResponseStatusException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    HttpStatus.NOT_FOUND,
                     "Не удалось получить HLS-файл",
                     e
             );
@@ -96,5 +111,16 @@ public class HlsController {
                     "Неподдерживаемый тип HLS-файла"
             );
         };
+    }
+
+    private com.group.cover_hub.model.enums.MediaType fromStringToEnum(String input) {
+        try {
+            return com.group.cover_hub.model.enums.MediaType.valueOf(input.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Указан неподдерживаемый тип медиа"
+            );
+        }
     }
 }

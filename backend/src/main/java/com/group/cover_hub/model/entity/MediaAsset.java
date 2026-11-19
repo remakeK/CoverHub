@@ -1,5 +1,6 @@
 package com.group.cover_hub.model.entity;
 
+import com.group.cover_hub.model.enums.MediaStatus;
 import com.group.cover_hub.model.enums.MediaType;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -26,10 +27,16 @@ public class MediaAsset {
     @Column(nullable = false)
     private MediaType mediaType;
 
+    @Enumerated(EnumType.STRING)
+    //@Column(nullable = false)
+    private MediaStatus mediaStatus;
+
     private String objectKey;
     private String originalFileName;
     private String mimeType;
     private Long fileSize;
+
+
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "cover_id", nullable = false)

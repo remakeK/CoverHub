@@ -9,12 +9,12 @@ import java.nio.file.Path;
 
 @Service
 public class FfmpegService {
-    public void convertToHls(Path inputPath, Path outputDirectory) throws IOException, InterruptedException {
+    public void convertToHls(Path inputPath, Path outputDirectory, String mediaType) throws IOException, InterruptedException {
         Files.createDirectories(outputDirectory);
 
         ProcessBuilder builder = new ProcessBuilder(
                 "bash",
-                "/app/scripts/convert-to-hls.sh",
+                "/app/scripts/convert-"+mediaType+"-to-hls.sh",
                 inputPath.toAbsolutePath().toString(),
                 outputDirectory.toAbsolutePath().toString()
         );
@@ -26,12 +26,18 @@ public class FfmpegService {
 
         Process process = builder.start();
 
-        int exitCode = process.waitFor();
+        try {
+            int exitCode = process.waitFor();
 
-        if (exitCode != 0) {
-            throw new RuntimeException(
-                    "FFmpeg processing failed with code: " + exitCode
-            );
+            if (exitCode != 0) {
+                throw new RuntimeException(
+                        "FFmpeg processing failed with code: " + exitCode
+                );
+            }
+        } catch (InterruptedException e) {
+            process.destroyForcibly();
+            throw e;
         }
     }
+
 }

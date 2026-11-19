@@ -1,8 +1,10 @@
 package com.group.cover_hub.controller;
 
 import com.group.cover_hub.media.HlsProcessingService;
-import com.group.cover_hub.media.StorageService;
+import com.group.cover_hub.media.MediaService;
+import com.group.cover_hub.media.MinioStorageService;
 import com.group.cover_hub.model.enums.MediaType;
+import io.minio.errors.MinioException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -14,17 +16,19 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Locale;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/covers")
+@RequestMapping("/api/covers/media")
 @RequiredArgsConstructor
 public class MediaController {
-    private final StorageService storageService;
+    private final MinioStorageService storageService;
     private final HlsProcessingService hlsProcessingService;
+    private final MediaService mediaService;
 
-    @PostMapping("/{coverId}/media")
-    public ResponseEntity<Void> uploadMedia(
+    @PostMapping("/{coverId}")
+    public ResponseEntity<String> uploadMedia(
             @PathVariable Long coverId,
             @RequestParam(required = false) MultipartFile video,
             @RequestParam(required = false) MultipartFile audio,
@@ -34,17 +38,21 @@ public class MediaController {
         uploadIfPresent(coverId, audio, MediaType.AUDIO);
         uploadIfPresent(coverId, image, MediaType.IMAGE);
 
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body("Все файлы загрузились без ошибок.");
     }
 
-    @PostMapping("/{coverId}/media/VIDEO/process")
-    public ResponseEntity<Map<String, String>> processVideo(
-            @PathVariable Long coverId
+    @PostMapping("/{coverId}/{mediaType}/process")
+    public ResponseEntity<Map<String, String>> processMedia(
+            @PathVariable Long coverId,
+            @PathVariable String mediaType
     ) {
-        try {
-            String masterPlaylistKey = hlsProcessingService.processVideo(coverId);
 
-            String playbackUrl = "/api/covers/" + coverId + "/media/hls/master.m3u8";
+        try {
+            hlsProcessingService.processMedia(coverId, fromStringToEnum(mediaType));
+
+            String playbackUrl = "/api/covers/" + coverId + "/media/hls/" + mediaType + "/master.m3u8";
 
             return ResponseEntity.ok(
                     Map.of("playbackUrl", playbackUrl)
@@ -62,19 +70,37 @@ public class MediaController {
         } catch (IOException e) {
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Ошибка при обработке видео",
+                    "Ошибка при обработке медиа",
                     e
             );
         }
     }
 
-    @GetMapping("/{coverId}/media/{mediaType}/download")
+    @DeleteMapping("/{coverId}/{mediaType}")
+    public ResponseEntity<Void> deleteMedia(
+            @PathVariable Long coverId,
+            @PathVariable String mediaType
+    ) {
+        try {
+            mediaService.delete(coverId, fromStringToEnum(mediaType));
+        } catch (IOException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Ошибка при удалении видео", e
+            );
+        } catch (MinioException e) {
+            throw new RuntimeException(e);
+        }
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{coverId}//{mediaType}/download")
     public ResponseEntity<StreamingResponseBody> downloadMedia(
             @PathVariable Long coverId,
-            @PathVariable MediaType mediaType
+            @PathVariable String mediaType
     ) {
-        InputStream inputStream =
-                storageService.download(coverId, mediaType);
+        InputStream inputStream = storageService.download(coverId, fromStringToEnum(mediaType));
 
         StreamingResponseBody responseBody = outputStream -> {
             try (inputStream) {
@@ -91,13 +117,19 @@ public class MediaController {
                 .body(responseBody);
     }
 
-    private void uploadIfPresent(
-            Long coverId,
-            MultipartFile file,
-            MediaType mediaType
-    ) {
+    private void uploadIfPresent(Long coverId, MultipartFile file, MediaType mediaType) {
         if (file != null && !file.isEmpty()) {
             storageService.upload(coverId, file, mediaType);
+        }
+    }
+    private MediaType fromStringToEnum(String input) {
+        try {
+            return MediaType.valueOf(input.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Указан неподдерживаемый тип медиа"
+            );
         }
     }
 }

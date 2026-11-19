@@ -5,11 +5,11 @@ import com.group.cover_hub.exception.ResourceNotFoundException;
 import com.group.cover_hub.model.entity.Cover;
 import com.group.cover_hub.model.entity.MediaAsset;
 import com.group.cover_hub.model.enums.*;
+import com.group.cover_hub.model.validator.MediaValidator;
 import com.group.cover_hub.repository.CoverRepository;
 import com.group.cover_hub.repository.MediaAssetRepository;
-import io.minio.GetObjectArgs;
-import io.minio.MinioClient;
-import io.minio.PutObjectArgs;
+import io.minio.*;
+import io.minio.messages.Item;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,7 +23,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class MinioStorageService implements StorageService {
+public class MinioStorageService {
     private final MinioClient minioClient;
     private final MediaAssetRepository mediaAssetRepository;
     private final CoverRepository coverRepository;
@@ -32,13 +32,12 @@ public class MinioStorageService implements StorageService {
     private String bucketName;
 
     @Transactional
-    @Override
     public String upload(Long coverId, MultipartFile file, MediaType mediaType) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Пустой файл");
         }
 
-        String extension = getExtension(file.getOriginalFilename());
+        String extension = MediaValidator.getExtension(file.getOriginalFilename());
         validate(file, mediaType, extension);
 
         String folder = switch (mediaType) {
@@ -51,17 +50,11 @@ public class MinioStorageService implements StorageService {
 
         Cover cover = coverRepository.findById(coverId)
                 .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Кавер не найден: " + coverId
-                        )
+                        new ResourceNotFoundException("Кавер не найден: " + coverId)
                 );
 
-        if (mediaAssetRepository.existsByCover_IdAndMediaType(
-                coverId, mediaType)) {
-
-            throw new ResourceAlreadyExistsException(
-                    "Для этого кавера уже загружен файл типа " + mediaType
-            );
+        if (mediaAssetRepository.existsByCover_IdAndMediaType(coverId, mediaType)) {
+            throw new ResourceAlreadyExistsException("Для этого кавера уже загружен файл типа " + mediaType);
         }
 
         MediaAsset mediaAsset = new MediaAsset();
@@ -71,8 +64,8 @@ public class MinioStorageService implements StorageService {
         mediaAsset.setMimeType(file.getContentType());
         mediaAsset.setFileSize(file.getSize());
         mediaAsset.setObjectKey(objectKey);
+        mediaAsset.setMediaStatus(MediaStatus.DRAFT);
 
-        mediaAssetRepository.save(mediaAsset);
 
         try {
             uploadObject(
@@ -83,21 +76,29 @@ public class MinioStorageService implements StorageService {
             );
             if(mediaType.equals(MediaType.VIDEO) || mediaType.equals(MediaType.AUDIO)){
                 cover.setStatus(CoverStatus.UPLOADED);
-
+                mediaAsset.setMediaStatus(MediaStatus.UPLOADED);
                 coverRepository.save(cover);
             }
+            mediaAssetRepository.save(mediaAsset);
 
         } catch (IOException e) {
+            try {
+                delete(objectKey);
+            } catch (IOException ex) {
+                throw new RuntimeException(
+                        "Ошибка при удалении файла в MiniO"
+                    );
+            }
 
             throw new RuntimeException(
                     "Ошибка при загрузке файла в MinIO", e
             );
         }
 
+
         return objectKey;
     }
 
-    @Override
     public InputStream download(Long coverId, MediaType mediaType) {
         MediaAsset mediaAsset = mediaAssetRepository
                 .findByCover_IdAndMediaType(coverId, mediaType)
@@ -137,7 +138,7 @@ public class MinioStorageService implements StorageService {
             }
 
             throw new IOException(
-                    "Ошибка при загрузке объекта в MinIO: " + objectKey, e
+                    "Ошибка при загрузке объекта в MinIO", e
             );
         }
     }
@@ -152,7 +153,56 @@ public class MinioStorageService implements StorageService {
             );
         } catch (Exception e) {
             throw new IOException(
-                    "Ошибка при скачивании объекта из MinIO: " + objectKey, e
+                    "Ошибка при скачивании объекта из MinIO", e
+            );
+        }
+    }
+    public void deleteHls(Long coverId, MediaType mediaType) throws IOException {
+        String mediaTypeString = mediaType.name().toLowerCase(Locale.ROOT);
+
+        String hlsPrefix = "hls/"
+                + mediaTypeString
+                + "/"
+                + coverId;
+
+        try {
+            Iterable<Result<Item>> objects = minioClient.listObjects(
+                    ListObjectsArgs.builder()
+                            .bucket(bucketName)
+                            .prefix(hlsPrefix)
+                            .recursive(true)
+                            .build()
+            );
+
+            for (Result<Item> result : objects) {
+                String objectName = result.get().objectName();
+
+                minioClient.removeObject(
+                        RemoveObjectArgs.builder()
+                                .bucket(bucketName)
+                                .object(objectName)
+                                .build()
+                );
+            }
+
+        } catch (Exception e) {
+            throw new IOException(
+                    "Ошибка при удалении HLS-файлов кавера", e
+            );
+        }
+    }
+
+    public void delete(String objectKey) throws IOException {
+        try {
+            minioClient.removeObject(
+                    RemoveObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectKey)
+                            .build()
+            );
+        } catch (Exception e) {
+            throw new IOException(
+                    "Ошибка при удалении объекта из MinIO", e
             );
         }
     }
@@ -172,7 +222,7 @@ public class MinioStorageService implements StorageService {
         String mimeType = file.getContentType();
         if (mimeType == null || mimeType.isBlank()) {
             throw new IllegalArgumentException(
-                    "Не удалось определить MIME-тип файла"
+                    "Не удалось определить MIME-тип файла: " + mimeType
             );
         }
 
@@ -180,16 +230,16 @@ public class MinioStorageService implements StorageService {
 
         boolean valid = switch (mediaType) {
             case AUDIO ->
-                    isSupportedAudioExtension(extension)
-                            && isSupportedAudioMime(mimeType);
+                    MediaValidator.isSupportedAudioExtension(extension)
+                            && MediaValidator.isSupportedAudioMime(mimeType);
 
             case VIDEO ->
-                    isSupportedVideoExtension(extension)
+                    MediaValidator.isSupportedVideoExtension(extension)
                             && mimeType.equals("video/mp4");
 
             case IMAGE ->
-                    isSupportedImageExtension(extension)
-                            && isSupportedImageMime(mimeType);
+                    MediaValidator.isSupportedImageExtension(extension)
+                            && MediaValidator.isSupportedImageMime(mimeType);
         };
 
         if (!valid) {
@@ -197,60 +247,5 @@ public class MinioStorageService implements StorageService {
                     "Недопустимое сочетание расширения и MIME-типа"
             );
         }
-    }
-
-    private boolean isSupportedAudioExtension(String extension) {
-        try {
-            SupportedAudioType.valueOf(extension.substring(1));
-            return true;
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
-    }
-
-    private boolean isSupportedAudioMime(String mimeType) {
-        return mimeType.equals("audio/mpeg")
-                || mimeType.equals("audio/wav")
-                || mimeType.equals("audio/x-wav");
-    }
-
-    private boolean isSupportedVideoExtension(String extension) {
-        try {
-            SupportedVideoType.valueOf(extension.substring(1));
-            return true;
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
-    }
-
-    private boolean isSupportedImageExtension(String extension) {
-        try {
-            SupportedImageType.valueOf(extension.substring(1));
-            return true;
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
-    }
-
-    private boolean isSupportedImageMime(String mimeType) {
-        return mimeType.equals("image/png")
-                || mimeType.equals("image/jpeg");
-    }
-
-    private String getExtension(String originalFilename) {
-
-        if (originalFilename == null) {
-            return "";
-        }
-
-        int dotIndex = originalFilename.lastIndexOf('.');
-
-        if (dotIndex < 0) {
-            return "";
-        }
-
-        return originalFilename
-                .substring(dotIndex)
-                .toUpperCase(Locale.ROOT);
     }
 }
