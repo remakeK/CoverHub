@@ -4,10 +4,13 @@ import com.group.cover_hub.exception.ResourceNotFoundException;
 import com.group.cover_hub.model.entity.Cover;
 import com.group.cover_hub.model.entity.MediaAsset;
 import com.group.cover_hub.model.enums.CoverStatus;
+import com.group.cover_hub.model.enums.MediaStatus;
 import com.group.cover_hub.model.enums.MediaType;
+import com.group.cover_hub.model.validator.MediaValidator;
 import com.group.cover_hub.repository.CoverRepository;
 import com.group.cover_hub.repository.MediaAssetRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -18,10 +21,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
+import java.util.Locale;
 import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class HlsProcessingService {
     private final MediaAssetRepository mediaAssetRepository;
     private final CoverRepository coverRepository;
@@ -31,12 +36,18 @@ public class HlsProcessingService {
     @Value("${app.media.temp-dir:/app/temp}")
     private String tempDirectory;
 
-    public String processVideo(Long coverId) throws IOException, InterruptedException {
-        MediaAsset video = mediaAssetRepository
-                .findByCover_IdAndMediaType(coverId, MediaType.VIDEO)
+    public String processMedia(Long coverId, MediaType mediaType) throws IOException, InterruptedException {
+        if (mediaType != MediaType.AUDIO && mediaType != MediaType.VIDEO) {
+            throw new IllegalArgumentException(
+                    "Unsupported media type for HLS processing: " + mediaType
+            );
+        }
+
+        MediaAsset media = mediaAssetRepository
+                .findByCover_IdAndMediaType(coverId, mediaType)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(
-                                "Элемент не найден"
+                                "Media " + mediaType + " not found for cover " + coverId
                         )
                 );
 
@@ -44,57 +55,103 @@ public class HlsProcessingService {
                 .findById(coverId)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
-                                        "Элемент не найден"
+                                        "Кавер не найден"
                                 )
                         );
+
         cover.setStatus(CoverStatus.PROCESSING);
+        media.setMediaStatus(MediaStatus.PROCESSING);
         coverRepository.save(cover);
+        mediaAssetRepository.save(media);
 
-        Path tempRoot = Paths.get(tempDirectory);
-        Files.createDirectories(tempRoot);
-        Path workDirectory = Files.createTempDirectory(
-                tempRoot,
-                "cover-" + coverId + "-"
-        );
+        String mediaTypeString = media.getMediaType().name().toLowerCase(Locale.ROOT);
 
-        Path inputPath = workDirectory.resolve("input.mp4");
-        Path hlsDirectory = workDirectory.resolve("hls");
+        Path workDirectory = null;
 
         try {
+            Path tempRoot = Paths.get(tempDirectory);
+            Files.createDirectories(tempRoot);
 
-            try (InputStream inputStream = minioStorageService.downloadObject(video.getObjectKey()))
-            {
-                Files.copy(inputStream, inputPath, StandardCopyOption.REPLACE_EXISTING);
-            }
+            workDirectory = Files.createTempDirectory(
+                    tempRoot,
+                    "cover-" + mediaTypeString + "-" + coverId + "-"
+            );
 
-            ffmpegService.convertToHls(inputPath, hlsDirectory);
-            Path masterPlaylist = hlsDirectory.resolve("master.m3u8");
+            Path hlsDirectory = workDirectory
+                    .resolve("hls")
+                    .resolve(mediaTypeString);
 
-            if (!Files.isRegularFile(masterPlaylist)) {
-                throw new IOException(
-                        "FFmpeg did not create master.m3u8"
+            String hlsCoverPrefix = "hls/"
+                    + mediaTypeString
+                    + "/"
+                    + coverId;
+
+            Path inputPath = workDirectory.resolve(
+                    "input." + MediaValidator.getExtension(
+                            media.getOriginalFileName()
+                    )
+            );
+
+            try (InputStream inputStream =
+                         minioStorageService.downloadObject(media.getObjectKey())) {
+                Files.copy(
+                        inputStream,
+                        inputPath,
+                        StandardCopyOption.REPLACE_EXISTING
                 );
             }
 
-            String hlsPrefix = "hls/" + coverId;
-            uploadHlsFiles(hlsDirectory, hlsPrefix);
-            String masterKey = hlsPrefix + "/master.m3u8";
+            ffmpegService.convertToHls(
+                    inputPath,
+                    hlsDirectory,
+                    mediaTypeString
+            );
 
-            cover.setHlsMasterObjectKey(masterKey);
-            cover.setStatus(CoverStatus.PROCESSING_COMPLETED);
+            Path masterPlaylist = hlsDirectory.resolve("master.m3u8");
+
+            if (!Files.isRegularFile(masterPlaylist)) {
+                throw new IOException("FFmpeg did not create master.m3u8");
+            }
+
+            cleanupHls(coverId, mediaType);
+            uploadHlsFiles(hlsDirectory, hlsCoverPrefix);
+
+            String masterKey = hlsCoverPrefix + "/master.m3u8";
+
+            switch (mediaType){
+                case AUDIO -> cover.setAudioHlsMasterObjectKey(masterKey);
+                case VIDEO -> cover.setVideoHlsMasterObjectKey(masterKey);
+            }
+
+            media.setMediaStatus(MediaStatus.PROCESSING_COMPLETED);
+            mediaAssetRepository.save(media);
+
+            boolean allProcessed =
+                    mediaAssetRepository.existsByCover_Id(coverId)
+                            && !mediaAssetRepository.existsByCover_IdAndMediaStatusNot(
+                            coverId,
+                            MediaStatus.PROCESSING_COMPLETED
+                    );
+
+            if(allProcessed){
+                cover.setStatus(CoverStatus.PROCESSING_COMPLETED);
+            }
             coverRepository.save(cover);
-
             return masterKey;
 
         } catch (IOException | RuntimeException e) {
-            cover.setStatus(CoverStatus.PROCESSING_FAILED);
-            coverRepository.save(cover);
+            media.setMediaStatus(MediaStatus.PROCESSING_FAILED);
+            mediaAssetRepository.save(media);
+            cleanupHls(coverId, mediaType);
+
             throw e;
 
         } catch (InterruptedException e) {
-            cover.setStatus(CoverStatus.PROCESSING_FAILED);
-            coverRepository.save(cover);
+            media.setMediaStatus(MediaStatus.PROCESSING_FAILED);
+            mediaAssetRepository.save(media);
             Thread.currentThread().interrupt();
+            cleanupHls(coverId, mediaType);
+
             throw e;
 
         } finally {
@@ -102,12 +159,11 @@ public class HlsProcessingService {
         }
     }
 
-
     private void uploadHlsFiles(Path hlsDirectory, String hlsPrefix) throws IOException {
         try (Stream<Path> paths = Files.walk(hlsDirectory)) {
             for (Path file : paths
                     .filter(Files::isRegularFile)
-                    .filter(this::isHlsFile)
+                    .filter(MediaValidator::isHlsFile)
                     .toList()) {
 
                 String relativePath = hlsDirectory
@@ -130,13 +186,8 @@ public class HlsProcessingService {
         }
     }
 
-    private boolean isHlsFile(Path file) {
-        String name = file.getFileName().toString();
-        return name.endsWith(".m3u8") || name.endsWith(".ts");
-    }
-
     private String getContentType(Path file) {
-        String name = file.getFileName().toString();
+        String name = file.getFileName().toString().toLowerCase();
         if (name.endsWith(".m3u8")) {
             return "application/vnd.apple.mpegurl";
         }
@@ -148,7 +199,7 @@ public class HlsProcessingService {
 
     private void deleteDirectory(Path directory) {
 
-        if (!Files.exists(directory)) {
+        if (directory == null || !Files.exists(directory)) {
             return;
         }
 
@@ -162,7 +213,22 @@ public class HlsProcessingService {
             }
 
         } catch (IOException e) {
-            System.out.println("Ошибка при удалении временной деректории");;
+            log.error(
+                "Failed to delete temporary directory: {}", directory, e
+        );
+        }
+    }
+
+    private void cleanupHls(Long coverId, MediaType mediaType) {
+        try {
+            minioStorageService.deleteHls(coverId, mediaType);
+        } catch (Exception e) {
+            log.error(
+                    "Failed to delete HLS files for cover {} and type {}",
+                    coverId,
+                    mediaType,
+                    e
+            );
         }
     }
 }

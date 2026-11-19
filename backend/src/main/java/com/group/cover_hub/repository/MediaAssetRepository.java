@@ -1,11 +1,13 @@
 package com.group.cover_hub.repository;
 
 import com.group.cover_hub.model.entity.MediaAsset;
+import com.group.cover_hub.model.enums.MediaStatus;
 import com.group.cover_hub.model.enums.MediaType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+
 
 @Repository
 public interface MediaAssetRepository extends JpaRepository<MediaAsset, Long> {
@@ -20,4 +22,9 @@ public interface MediaAssetRepository extends JpaRepository<MediaAsset, Long> {
     );
 
     boolean existsByCover_Id(Long coverId);
+
+    boolean existsByCover_IdAndMediaStatusNot(
+            Long coverId,
+            MediaStatus mediaStatus
+    );
 }

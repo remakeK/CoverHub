@@ -45,7 +45,6 @@ public class CoverService {
 
     private void applyRequest(Cover cover, CoverRequest request) {
         cover.setTitle(request.getTitle());
-        cover.setAudioUrl(request.getAudioUrl());
         cover.setYoutubeUrl(request.getYoutubeUrl());
         cover.setUser(lookup.user(request.getCreatorId()));
         cover.setCategory(lookup.category(request.getCategoryId()));
@@ -56,8 +55,6 @@ public class CoverService {
         return CoverResponse.builder()
                 .id(cover.getId())
                 .title(cover.getTitle())
-                .hlsMasterObjectKey(cover.getHlsMasterObjectKey())
-                .audioUrl(cover.getAudioUrl())
                 .youtubeUrl(cover.getYoutubeUrl())
                 .createdAt(cover.getCreatedAt())
                 .creatorId(cover.getUser().getId())

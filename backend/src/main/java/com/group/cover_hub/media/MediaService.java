@@ -22,25 +22,29 @@ public class MediaService {
     private final CoverRepository coverRepository;
 
     @Transactional
-    public void deleteVideo(Long coverId) throws IOException, MinioException {
+    public void delete(Long coverId, MediaType mediaType) throws IOException, MinioException {
         Cover cover = coverRepository.findById(coverId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Кавер не найден")
                 );
-        MediaAsset mediaAsset = mediaAssetRepository.findByCover_IdAndMediaType(coverId, MediaType.VIDEO)
+        MediaAsset mediaAsset = mediaAssetRepository.findByCover_IdAndMediaType(coverId, mediaType)
                 .orElseThrow(() ->
-                        new ResourceNotFoundException("Видео не найдено: ")
+                        new ResourceNotFoundException("Медиа не найдено")
                 );
-
-
-        minioStorageService.deleteHls(coverId);
-        minioStorageService.deleteObject(mediaAsset.getObjectKey());
+        if(!mediaAsset.getMediaType().equals(MediaType.IMAGE)) {
+            minioStorageService.deleteHls(coverId, mediaType);
+        }
+        minioStorageService.delete(mediaAsset.getObjectKey());
 
         cover.getMediaAssets().remove(mediaAsset);
         mediaAssetRepository.delete(mediaAsset);
-        cover.setHlsMasterObjectKey(null);
+        switch (mediaType){
+            case VIDEO -> cover.setVideoHlsMasterObjectKey(null);
+            case AUDIO -> cover.setAudioHlsMasterObjectKey(null);
+            case IMAGE -> cover.setThumbnailUrl(null);
+        }
 
-        if (!mediaAssetRepository.existsByCover_Id(coverId) && cover.getYoutubeUrl().isBlank()) {
+        if (!mediaAssetRepository.existsByCover_Id(coverId) && cover.getYoutubeUrl() == null) {
             cover.setStatus(CoverStatus.DRAFT);
         }
     }
