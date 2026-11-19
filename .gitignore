@@ -1,2 +1,6 @@
 .env
 storage/
+video-test/
+audio-test/
+test/
+temp.txt
