@@ -1,0 +1,17 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 16px;
+  color: #f2f2f5;
+  background: #121218;
+  --background: #121218;
+  --surface: #1e1e28;
+  --input: #2a2a38;
+  --text: #f2f2f5;
+  --muted: #a0a0b2;
+  --accent: #a78bfa;
+  --accent-pressed: #8967eb;
+  --border: #666679;
+  --danger: #e8877c;
+  --success: #8bdc8b;
+}
